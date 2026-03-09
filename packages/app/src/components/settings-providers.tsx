@@ -104,12 +104,12 @@ export const SettingsProviders: Component = () => {
 
   const disconnect = async (providerID: string, name: string) => {
     if (isConfigCustom(providerID)) {
-      await globalSDK.client.auth.remove({ providerID }).catch(() => undefined)
+      await globalSDK.client.auth.remove({ key: providerID }).catch(() => undefined)
       await disableProvider(providerID, name)
       return
     }
     await globalSDK.client.auth
-      .remove({ providerID })
+      .remove({ key: providerID })
       .then(async () => {
         await globalSDK.client.global.dispose()
         showToast({

@@ -1998,10 +1998,10 @@ export type GlobalDisposeResponse = GlobalDisposeResponses[keyof GlobalDisposeRe
 export type AuthRemoveData = {
   body?: never
   path: {
-    providerID: string
+    key: string
   }
   query?: never
-  url: "/auth/{providerID}"
+  url: "/auth/{key}"
 }
 
 export type AuthRemoveErrors = {
@@ -2025,10 +2025,10 @@ export type AuthRemoveResponse = AuthRemoveResponses[keyof AuthRemoveResponses]
 export type AuthSetData = {
   body?: Auth
   path: {
-    providerID: string
+    key: string
   }
   query?: never
-  url: "/auth/{providerID}"
+  url: "/auth/{key}"
 }
 
 export type AuthSetErrors = {
@@ -4067,6 +4067,10 @@ export type ProviderOauthCallbackData = {
      * OAuth authorization code
      */
     code?: string
+    /**
+     * Account alias
+     */
+    alias?: string
   }
   path: {
     /**

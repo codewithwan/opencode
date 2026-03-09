@@ -133,7 +133,8 @@ export namespace Provider {
       const hasKey = await (async () => {
         const env = Env.all()
         if (input.env.some((item) => env[item])) return true
-        if (await Auth.get(input.id)) return true
+        const accounts = await Auth.listByProvider(input.id)
+        if (Object.keys(accounts).length > 0) return true
         const config = await Config.get()
         if (config.provider?.["opencode"]?.options?.apiKey) return true
         return false
@@ -982,13 +983,51 @@ export namespace Provider {
       }
     }
 
-    for (const [providerID, fn] of Object.entries(CUSTOM_LOADERS)) {
-      if (disabled.has(providerID)) continue
-      const data = database[providerID]
-      if (!data) {
-        log.error("Provider does not exist in model list " + providerID)
-        continue
+    const authList = await Auth.all()
+    const expandedProviders: { [providerID: string]: Info } = {}
+
+    for (const [providerID, provider] of Object.entries(providers)) {
+      expandedProviders[providerID] = provider
+
+      const aliases = Object.keys(authList).filter(
+        (k) => k.startsWith(providerID + "/") && k.split("/").length === 2 && k.split("/")[0] === providerID,
+      )
+
+      for (const aliasKey of aliases) {
+        if (expandedProviders[aliasKey]) continue
+        const aliasName = aliasKey.substring(providerID.length + 1)
+        const clone: Info = {
+          ...provider,
+          id: aliasKey,
+          name: `${provider.name} (${aliasName})`,
+          options: { ...provider.options },
+          env: [...provider.env],
+          models: {},
+        }
+        const auth = authList[aliasKey]
+        if (auth.type === "api") {
+          clone.key = auth.key
+          clone.source = "api"
+        } else if (auth.type === "oauth") {
+          clone.source = "env"
+          clone.key = auth.access
+        }
+        for (const [modelID, model] of Object.entries(provider.models)) {
+          clone.models[modelID] = { ...model, providerID: aliasKey }
+        }
+        expandedProviders[aliasKey] = clone
       }
+    }
+
+    for (const key of Object.keys(providers)) delete providers[key]
+    Object.assign(providers, expandedProviders)
+
+    for (const [providerID, data] of Object.entries(providers)) {
+      if (disabled.has(providerID)) continue
+      const baseID = providerID.split("/")[0]
+      const fn = CUSTOM_LOADERS[baseID]
+      if (!fn) continue
+
       const result = await fn(data)
       if (result && (result.autoload || providers[providerID])) {
         if (result.getModel) modelLoaders[providerID] = result.getModel

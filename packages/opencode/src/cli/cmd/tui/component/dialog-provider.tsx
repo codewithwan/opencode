@@ -1,6 +1,6 @@
 import { createMemo, createSignal, onMount, Show } from "solid-js"
 import { useSync } from "@tui/context/sync"
-import { map, pipe, sortBy } from "remeda"
+import { map, pipe, sortBy, filter } from "remeda"
 import { DialogSelect } from "@tui/ui/dialog-select"
 import { useDialog } from "@tui/ui/dialog"
 import { useSDK } from "../context/sdk"
@@ -30,6 +30,7 @@ export function createDialogProviderOptions() {
   const options = createMemo(() => {
     return pipe(
       sync.data.provider_next.all,
+      filter((x) => !x.id.includes("/")),
       sortBy((x) => PROVIDER_PRIORITY[x.id] ?? 99),
       map((provider) => ({
         title: provider.name,
@@ -42,6 +43,16 @@ export function createDialogProviderOptions() {
         }[provider.id],
         category: provider.id in PROVIDER_PRIORITY ? "Popular" : "Other",
         async onSelect() {
+          const aliasValue = await DialogPrompt.show(dialog, "Account alias (optional)", {
+            placeholder: "Press enter to skip",
+          })
+          if (aliasValue === null) return
+          let alias: string | undefined = aliasValue.trim() || undefined
+          if (alias && !/^[a-z0-9_-]*$/.test(alias)) {
+            dialog.replace(() => <DialogProvider />)
+            return
+          }
+
           const methods = sync.data.provider_auth[provider.id] ?? [
             {
               type: "api",
@@ -75,17 +86,17 @@ export function createDialogProviderOptions() {
             })
             if (result.data?.method === "code") {
               dialog.replace(() => (
-                <CodeMethod providerID={provider.id} title={method.label} index={index} authorization={result.data!} />
+                <CodeMethod providerID={provider.id} title={method.label} index={index} authorization={result.data!} alias={alias} />
               ))
             }
             if (result.data?.method === "auto") {
               dialog.replace(() => (
-                <AutoMethod providerID={provider.id} title={method.label} index={index} authorization={result.data!} />
+                <AutoMethod providerID={provider.id} title={method.label} index={index} authorization={result.data!} alias={alias} />
               ))
             }
           }
           if (method.type === "api") {
-            return dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} />)
+            return dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} alias={alias} />)
           }
         },
       })),
@@ -104,6 +115,7 @@ interface AutoMethodProps {
   providerID: string
   title: string
   authorization: ProviderAuthAuthorization
+  alias?: string
 }
 function AutoMethod(props: AutoMethodProps) {
   const { theme } = useTheme()
@@ -125,6 +137,7 @@ function AutoMethod(props: AutoMethodProps) {
     const result = await sdk.client.provider.oauth.callback({
       providerID: props.providerID,
       method: props.index,
+      alias: props.alias
     })
     if (result.error) {
       dialog.clear()
@@ -162,6 +175,7 @@ interface CodeMethodProps {
   title: string
   providerID: string
   authorization: ProviderAuthAuthorization
+  alias?: string
 }
 function CodeMethod(props: CodeMethodProps) {
   const { theme } = useTheme()
@@ -179,6 +193,7 @@ function CodeMethod(props: CodeMethodProps) {
           providerID: props.providerID,
           method: props.index,
           code: value,
+          alias: props.alias
         })
         if (!error) {
           await sdk.client.instance.dispose()
@@ -204,6 +219,7 @@ function CodeMethod(props: CodeMethodProps) {
 interface ApiMethodProps {
   providerID: string
   title: string
+  alias?: string
 }
 function ApiMethod(props: ApiMethodProps) {
   const dialog = useDialog()
@@ -243,8 +259,9 @@ function ApiMethod(props: ApiMethodProps) {
       }
       onConfirm={async (value) => {
         if (!value) return
+        const key = props.alias ? `${props.providerID}/${props.alias}` : props.providerID
         await sdk.client.auth.set({
-          providerID: props.providerID,
+          key,
           auth: {
             type: "api",
             key: value,

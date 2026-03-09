@@ -70,6 +70,7 @@ const TIPS = [
   "Run {highlight}/connect{/highlight} to add API keys for 75+ supported LLM providers",
   "The leader key is {highlight}Ctrl+X{/highlight}; combine with other keys for quick actions",
   "Press {highlight}F2{/highlight} to quickly switch between recently used models",
+  "Press {highlight}F3{/highlight} to quickly switch between connected accounts for the current model",
   "Press {highlight}Ctrl+X B{/highlight} to show/hide the sidebar panel",
   "Use {highlight}PageUp{/highlight}/{highlight}PageDown{/highlight} to navigate through conversation history",
   "Press {highlight}Ctrl+G{/highlight} or {highlight}Home{/highlight} to jump to the beginning of the conversation",

@@ -149,15 +149,17 @@ export const ProviderRoutes = lazy(() =>
         z.object({
           method: z.number().meta({ description: "Auth method index" }),
           code: z.string().optional().meta({ description: "OAuth authorization code" }),
+          alias: z.string().optional().meta({ description: "Account alias" }),
         }),
       ),
       async (c) => {
         const providerID = c.req.valid("param").providerID
-        const { method, code } = c.req.valid("json")
+        const { method, code, alias } = c.req.valid("json")
         await ProviderAuth.callback({
           providerID,
           method,
           code,
+          alias,
         })
         return c.json(true)
       },

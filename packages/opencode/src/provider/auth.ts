@@ -76,6 +76,7 @@ export namespace ProviderAuth {
       providerID: z.string(),
       method: z.number(),
       code: z.string().optional(),
+      alias: z.string().optional(),
     }),
     async (input) => {
       const match = await state().then((s) => s.pending[input.providerID])
@@ -92,8 +93,9 @@ export namespace ProviderAuth {
       }
 
       if (result?.type === "success") {
+        const key = Auth.resolveKey(input.providerID, input.alias)
         if ("key" in result) {
-          await Auth.set(input.providerID, {
+          await Auth.set(key, {
             type: "api",
             key: result.key,
           })
@@ -108,7 +110,7 @@ export namespace ProviderAuth {
           if (result.accountId) {
             info.accountId = result.accountId
           }
-          await Auth.set(input.providerID, info)
+          await Auth.set(key, info)
         }
         return
       }
@@ -121,9 +123,10 @@ export namespace ProviderAuth {
     z.object({
       providerID: z.string(),
       key: z.string(),
+      alias: z.string().optional(),
     }),
     async (input) => {
-      await Auth.set(input.providerID, {
+      await Auth.set(Auth.resolveKey(input.providerID, input.alias), {
         type: "api",
         key: input.key,
       })

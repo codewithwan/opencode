@@ -317,13 +317,13 @@ export class Auth extends HeyApiClient {
    */
   public remove<ThrowOnError extends boolean = false>(
     parameters: {
-      providerID: string
+      key: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
-    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "providerID" }] }])
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "key" }] }])
     return (options?.client ?? this.client).delete<AuthRemoveResponses, AuthRemoveErrors, ThrowOnError>({
-      url: "/auth/{providerID}",
+      url: "/auth/{key}",
       ...options,
       ...params,
     })
@@ -336,7 +336,7 @@ export class Auth extends HeyApiClient {
    */
   public set<ThrowOnError extends boolean = false>(
     parameters: {
-      providerID: string
+      key: string
       auth?: Auth3
     },
     options?: Options<never, ThrowOnError>,
@@ -346,14 +346,14 @@ export class Auth extends HeyApiClient {
       [
         {
           args: [
-            { in: "path", key: "providerID" },
+            { in: "path", key: "key" },
             { key: "auth", map: "body" },
           ],
         },
       ],
     )
     return (options?.client ?? this.client).put<AuthSetResponses, AuthSetErrors, ThrowOnError>({
-      url: "/auth/{providerID}",
+      url: "/auth/{key}",
       ...options,
       ...params,
       headers: {
@@ -2536,6 +2536,7 @@ export class Oauth extends HeyApiClient {
       workspace?: string
       method?: number
       code?: string
+      alias?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -2549,6 +2550,7 @@ export class Oauth extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "method" },
             { in: "body", key: "code" },
+            { in: "body", key: "alias" },
           ],
         },
       ],

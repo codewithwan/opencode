@@ -446,6 +446,26 @@ function App() {
       },
     },
     {
+      title: "Account cycle",
+      value: "model.cycle_alias",
+      keybind: "model_cycle_alias",
+      category: "Agent",
+      hidden: true,
+      onSelect: () => {
+        local.model.cycleAlias(1)
+      },
+    },
+    {
+      title: "Account cycle reverse",
+      value: "model.cycle_alias_reverse",
+      keybind: "model_cycle_alias_reverse",
+      category: "Agent",
+      hidden: true,
+      onSelect: () => {
+        local.model.cycleAlias(-1)
+      },
+    },
+    {
       title: "Switch agent",
       value: "agent.list",
       keybind: "agent_list",
@@ -558,7 +578,7 @@ function App() {
       title: "Open docs",
       value: "docs.open",
       onSelect: () => {
-        open("https://opencode.ai/docs").catch(() => {})
+        open("https://opencode.ai/docs").catch(() => { })
         dialog.clear()
       },
       category: "System",

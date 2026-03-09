@@ -42,6 +42,19 @@ export namespace Auth {
     return auth[providerID]
   }
 
+  export async function listByProvider(providerID: string): Promise<Record<string, Info>> {
+    const data = await all()
+    return Object.fromEntries(
+      Object.entries(data).filter(([key]) => key === providerID || key.startsWith(providerID + "/")),
+    )
+  }
+
+  export function resolveKey(providerID: string, alias?: string): string {
+    if (!alias) return providerID
+    if (!/^[a-z0-9_-]+$/.test(alias)) throw new TypeError(`Invalid alias: ${alias}`)
+    return `${providerID}/${alias}`
+  }
+
   export async function all(): Promise<Record<string, Info>> {
     const data = await Filesystem.readJson<Record<string, unknown>>(filepath).catch(() => ({}))
     return Object.entries(data).reduce(

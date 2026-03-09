@@ -90,9 +90,9 @@ function validateCustomProvider(input: ValidateArgs) {
       : seenModels.has(id)
         ? input.t("provider.custom.error.duplicate")
         : (() => {
-            seenModels.add(id)
-            return undefined
-          })()
+          seenModels.add(id)
+          return undefined
+        })()
     const modelNameError = !m.name.trim() ? input.t("provider.custom.error.required") : undefined
     return { id: modelIdError, name: modelNameError }
   })
@@ -110,9 +110,9 @@ function validateCustomProvider(input: ValidateArgs) {
       : seenHeaders.has(key.toLowerCase())
         ? input.t("provider.custom.error.duplicate")
         : (() => {
-            seenHeaders.add(key.toLowerCase())
-            return undefined
-          })()
+          seenHeaders.add(key.toLowerCase())
+          return undefined
+        })()
     const valueError = !value ? input.t("provider.custom.error.required") : undefined
     return { key: keyError, value: valueError }
   })
@@ -240,12 +240,12 @@ export function DialogCustomProvider(props: Props) {
 
     const auth = result.key
       ? globalSDK.client.auth.set({
-          providerID: result.providerID,
-          auth: {
-            type: "api",
-            key: result.key,
-          },
-        })
+        key: result.providerID,
+        auth: {
+          type: "api",
+          key: result.key,
+        },
+      })
       : Promise.resolve()
 
     auth

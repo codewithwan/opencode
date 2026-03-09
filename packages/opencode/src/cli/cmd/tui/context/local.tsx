@@ -144,7 +144,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (Array.isArray(x.favorite)) setModelStore("favorite", x.favorite)
           if (typeof x.variant === "object" && x.variant !== null) setModelStore("variant", x.variant)
         })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => {
           setModelStore("ready", true)
           if (state.pending) save()
@@ -274,6 +274,44 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             uniq.map((x) => ({ providerID: x.providerID, modelID: x.modelID })),
           )
           save()
+        },
+        cycleAlias(direction: 1 | -1) {
+          const current = currentModel()
+          if (!current) return
+
+          const baseProviderID = current.providerID.split("/")[0]
+
+          // Find all active providers that match this baseProviderID and have this modelID
+          const availableProviders = sync.data.provider.filter(p => p.id === baseProviderID || p.id.startsWith(baseProviderID + "/")).filter(p => p.models[current.modelID])
+
+          if (availableProviders.length <= 1) {
+            toast.show({ variant: "info", message: "No other accounts connected for this provider", duration: 3000 })
+            return
+          }
+
+          const currentIndex = availableProviders.findIndex(p => p.id === current.providerID)
+          let nextIndex = currentIndex + direction
+          if (nextIndex < 0) nextIndex = availableProviders.length - 1
+          if (nextIndex >= availableProviders.length) nextIndex = 0
+
+          const nextProvider = availableProviders[nextIndex]
+
+          batch(() => {
+            setModelStore("model", agent.current().name, {
+              providerID: nextProvider.id,
+              modelID: current.modelID
+            })
+
+            // update recent models so history is preserved
+            const modelToSave = { providerID: nextProvider.id, modelID: current.modelID }
+            const uniq = uniqueBy([modelToSave, ...modelStore.recent], (x) => `${x.providerID}/${x.modelID}`)
+            if (uniq.length > 10) uniq.pop()
+            setModelStore(
+              "recent",
+              uniq.map((x) => ({ providerID: x.providerID, modelID: x.modelID })),
+            )
+            save()
+          })
         },
         set(model: { providerID: string; modelID: string }, options?: { recent?: boolean }) {
           batch(() => {
