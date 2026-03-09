@@ -17,11 +17,20 @@ import { setTimeout as sleep } from "node:timers/promises"
 
 type PluginAuth = NonNullable<Hooks["auth"]>
 
-/**
- * Handle plugin-based authentication flow.
- * Returns true if auth was handled, false if it should fall through to default handling.
- */
-async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, methodName?: string): Promise<boolean> {
+function validateAlias(x: string | undefined): string | undefined {
+  return !x || /^[a-z0-9_-]*$/.test(x) ? undefined : "a-z, 0-9, hyphens and underscores only"
+}
+
+async function promptAlias(): Promise<string | undefined> {
+  const input = await prompts.text({
+    message: "Account alias (optional, press enter to skip)",
+    validate: validateAlias,
+  })
+  if (prompts.isCancel(input)) throw new UI.CancelledError()
+  return input || undefined
+}
+
+async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, methodName?: string, alias?: string): Promise<boolean> {
   let index = 0
   if (methodName) {
     const match = plugin.auth.methods.findIndex((x) => x.label.toLowerCase() === methodName.toLowerCase())
@@ -47,7 +56,6 @@ async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, 
   }
   const method = plugin.auth.methods[index]
 
-  // Handle prompts for all auth types
   await sleep(10)
   const inputs: Record<string, string> = {}
   if (method.prompts) {
@@ -92,7 +100,7 @@ async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, 
         spinner.stop("Failed to authorize", 1)
       }
       if (result.type === "success") {
-        const saveProvider = result.provider ?? provider
+        const saveProvider = Auth.resolveKey(result.provider ?? provider, alias)
         if ("refresh" in result) {
           const { type: _, provider: __, refresh, access, expires, ...extraFields } = result
           await Auth.set(saveProvider, {
@@ -124,7 +132,7 @@ async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, 
         prompts.log.error("Failed to authorize")
       }
       if (result.type === "success") {
-        const saveProvider = result.provider ?? provider
+        const saveProvider = Auth.resolveKey(result.provider ?? provider, alias)
         if ("refresh" in result) {
           const { type: _, provider: __, refresh, access, expires, ...extraFields } = result
           await Auth.set(saveProvider, {
@@ -156,7 +164,7 @@ async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, 
         prompts.log.error("Failed to authorize")
       }
       if (result.type === "success") {
-        const saveProvider = result.provider ?? provider
+        const saveProvider = Auth.resolveKey(result.provider ?? provider, alias)
         await Auth.set(saveProvider, {
           type: "api",
           key: result.key,
@@ -224,14 +232,17 @@ export const AuthListCommand = cmd({
     const results = Object.entries(await Auth.all())
     const database = await ModelsDev.get()
 
-    for (const [providerID, result] of results) {
+    for (const [key, result] of results) {
+      const slash = key.indexOf("/")
+      const providerID = slash === -1 ? key : key.slice(0, slash)
+      const alias = slash === -1 ? undefined : key.slice(slash + 1)
       const name = database[providerID]?.name || providerID
-      prompts.log.info(`${name} ${UI.Style.TEXT_DIM}${result.type}`)
+      const label = alias ? `${name}  ${UI.Style.TEXT_DIM}${alias}  (${result.type})` : `${name}  ${UI.Style.TEXT_DIM}(${result.type})`
+      prompts.log.info(label)
     }
 
     prompts.outro(`${results.length} credentials`)
 
-    // Environment variables section
     const activeEnvVars: Array<{ provider: string; envVar: string }> = []
 
     for (const [providerID, provider] of Object.entries(database)) {
@@ -397,7 +408,8 @@ export const AuthLoginCommand = cmd({
 
         const plugin = await Plugin.list().then((x) => x.findLast((x) => x.auth?.provider === provider))
         if (plugin && plugin.auth) {
-          const handled = await handlePluginAuth({ auth: plugin.auth }, provider, args.method)
+          const alias = await promptAlias()
+          const handled = await handlePluginAuth({ auth: plugin.auth }, provider, args.method, alias)
           if (handled) return
         }
 
@@ -409,10 +421,10 @@ export const AuthLoginCommand = cmd({
           if (prompts.isCancel(custom)) throw new UI.CancelledError()
           provider = custom.replace(/^@ai-sdk\//, "")
 
-          // Check if a plugin provides auth for this custom provider
           const customPlugin = await Plugin.list().then((x) => x.findLast((x) => x.auth?.provider === provider))
           if (customPlugin && customPlugin.auth) {
-            const handled = await handlePluginAuth({ auth: customPlugin.auth }, provider, args.method)
+            const alias = await promptAlias()
+            const handled = await handlePluginAuth({ auth: customPlugin.auth }, provider, args.method, alias)
             if (handled) return
           }
 
@@ -445,12 +457,14 @@ export const AuthLoginCommand = cmd({
           )
         }
 
+        const alias = await promptAlias()
+
         const key = await prompts.password({
           message: "Enter your API key",
           validate: (x) => (x && x.length > 0 ? undefined : "Required"),
         })
         if (prompts.isCancel(key)) throw new UI.CancelledError()
-        await Auth.set(provider, {
+        await Auth.set(Auth.resolveKey(provider, alias), {
           type: "api",
           key,
         })
@@ -473,15 +487,21 @@ export const AuthLogoutCommand = cmd({
       return
     }
     const database = await ModelsDev.get()
-    const providerID = await prompts.select({
+    const selected = await prompts.select({
       message: "Select provider",
-      options: credentials.map(([key, value]) => ({
-        label: (database[key]?.name || key) + UI.Style.TEXT_DIM + " (" + value.type + ")",
-        value: key,
-      })),
+      options: credentials.map(([key, value]) => {
+        const slash = key.indexOf("/")
+        const providerID = slash === -1 ? key : key.slice(0, slash)
+        const alias = slash === -1 ? undefined : key.slice(slash + 1)
+        const name = database[providerID]?.name || providerID
+        const label = alias
+          ? `${name} / ${alias} ${UI.Style.TEXT_DIM}(${value.type})`
+          : `${name} ${UI.Style.TEXT_DIM}(${value.type})`
+        return { label, value: key }
+      }),
     })
-    if (prompts.isCancel(providerID)) throw new UI.CancelledError()
-    await Auth.remove(providerID)
+    if (prompts.isCancel(selected)) throw new UI.CancelledError()
+    await Auth.remove(selected)
     prompts.outro("Logout successful")
   },
 })

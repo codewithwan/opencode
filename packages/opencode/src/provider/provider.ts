@@ -133,7 +133,8 @@ export namespace Provider {
       const hasKey = await (async () => {
         const env = Env.all()
         if (input.env.some((item) => env[item])) return true
-        if (await Auth.get(input.id)) return true
+        const accounts = await Auth.listByProvider(input.id)
+        if (Object.keys(accounts).length > 0) return true
         const config = await Config.get()
         if (config.provider?.["opencode"]?.options?.apiKey) return true
         return false
